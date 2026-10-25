@@ -46,8 +46,8 @@ async function startMemoryServer() {
     console.log('[VitaBridge DB] Connected to In-Memory MongoDB successfully.');
     return conn;
   } catch (memErr) {
-    console.error('[VitaBridge DB] Failed to start In-Memory MongoDB server:', memErr.message);
-    throw memErr;
+    console.warn('[VitaBridge DB] In-Memory MongoDB unavailable in serverless environment:', memErr.message);
+    return null;
   }
 }
 

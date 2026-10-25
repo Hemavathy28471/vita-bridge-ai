@@ -1,5 +1,6 @@
 require('dotenv').config();
 const http = require('http');
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const { Server } = require('socket.io');
@@ -117,6 +118,20 @@ app.use('/api/simulation', simulationRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/checkup', checkupRoutes);
 
+// Serve static frontend assets from public/
+app.use(express.static(path.join(__dirname, 'public')));
+
+// SPA Fallback: Serve frontend for any non-API web route
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) {
+    return next();
+  }
+  const indexPath = path.join(__dirname, 'public', 'index.html');
+  res.sendFile(indexPath, (err) => {
+    if (err) next();
+  });
+});
+
 // Global Error Handler
 app.use((err, req, res, next) => {
   console.error('[VitaBridge Error]', err.stack);
@@ -130,27 +145,41 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 
 connectDB()
-  .then(async () => {
-    const userCount = await User.countDocuments();
-    if (userCount === 0) {
-      console.log('[VitaBridge DB] No users detected. Automatically populating realistic demo data...');
-      await seedAll();
+  .then(async (conn) => {
+    if (conn) {
+      try {
+        const userCount = await User.countDocuments();
+        if (userCount === 0) {
+          console.log('[VitaBridge DB] No users detected. Automatically populating realistic demo data...');
+          await seedAll();
+        }
+      } catch (seedErr) {
+        console.warn('[VitaBridge DB] Seeding notice:', seedErr.message);
+      }
     }
 
-    server.listen(PORT, () => {
-      console.log(`
+    if (process.env.VERCEL !== '1' && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      server.listen(PORT, () => {
+        console.log(`
 =========================================================
   VitaBridge AI Server Running on Port ${PORT}
   API Base: http://localhost:${PORT}/api
   Tagline: "Sense. Understand. Recheck. Warn Early."
   Decision-Support Guarantee: Active & Guardrailed
 =========================================================
-      `);
-    });
+        `);
+      });
+    }
   })
   .catch((err) => {
-    console.error('[VitaBridge Boot Error] Failed to initialize database:', err);
-    process.exit(1);
+    console.warn('[VitaBridge Boot Notice] Running in stateless mode:', err.message);
+    if (process.env.VERCEL !== '1' && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      server.listen(PORT, () => {
+        console.log(`VitaBridge AI Server Running in Stateless Mode on Port ${PORT}`);
+      });
+    }
   });
 
-module.exports = { app, server };
+module.exports = app;
+module.exports.app = app;
+module.exports.server = server;
