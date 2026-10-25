@@ -8,11 +8,13 @@ node_modules/
 .env.*.local
 *.env
 
-# Production build outputs
+# Production & Cache build outputs
 dist/
 build/
 */dist/
 */build/
+.vite/
+*/.vite/
 
 # Logs & Debug
 logs
